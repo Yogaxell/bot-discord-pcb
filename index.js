@@ -391,4 +391,6 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-client.login(process.env.TOKEN);
+const token = process.env.TOKEN;
+console.log("Token trouvé:", token ? "OUI" : "NON");
+client.login(token);
