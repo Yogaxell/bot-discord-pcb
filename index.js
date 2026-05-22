@@ -169,22 +169,12 @@ function buildPanierButtons(userId) {
   );
 }
 
-async function afficherPanier(interaction, update = false) {
-  const menu2 = buildMenuMeubles2();
+function getPanierComponents(userId) {
   const components = [buildMenuMeubles()];
+  const menu2 = buildMenuMeubles2();
   if (menu2) components.push(menu2);
-  components.push(buildPanierButtons(interaction.user.id));
-
-  const payload = {
-    embeds: [buildPanierEmbed(interaction.user.id)],
-    components,
-  };
-
-  if (update) {
-    await interaction.update(payload);
-  } else {
-    await interaction.reply({ ...payload, ephemeral: true });
-  }
+  components.push(buildPanierButtons(userId));
+  return components;
 }
 
 client.once('ready', () => {
@@ -241,22 +231,25 @@ client.on('interactionCreate', async (interaction) => {
   // ── PASSER COMMANDE ──
   if (interaction.isButton() && interaction.customId === 'passer_commande') {
     paniers.set(interaction.user.id, []);
-    await afficherPanier(interaction, false);
+    await interaction.reply({
+      embeds: [buildPanierEmbed(interaction.user.id)],
+      components: getPanierComponents(interaction.user.id),
+      ephemeral: true
+    });
   }
 
-  // ── CHOISIR MEUBLE (menu 1 ou 2) ──
+  // ── CHOISIR MEUBLE → ouvre modal directement ──
   if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble' || interaction.customId === 'choisir_meuble2')) {
     const meubleId = interaction.values[0];
     const meuble = catalogue[meubleId];
 
-    // Ouvrir un modal pour la quantité
     const modal = new ModalBuilder()
       .setCustomId(`modal_qte_${meubleId}`)
-      .setTitle(`Quantité — ${meuble.nom}`);
+      .setTitle(`${meuble.nom} — Quantité`);
 
     const input = new TextInputBuilder()
       .setCustomId('quantite')
-      .setLabel(`Combien de "${meuble.nom}" ? (prix unitaire: ${meuble.prix}€)`)
+      .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien en voulez-vous ?`)
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('Ex: 2')
       .setMinLength(1)
@@ -271,8 +264,7 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_qte_')) {
     const meubleId = interaction.customId.replace('modal_qte_', '');
     const meuble = catalogue[meubleId];
-    const qteStr = interaction.fields.getTextInputValue('quantite');
-    const qte = parseInt(qteStr);
+    const qte = parseInt(interaction.fields.getTextInputValue('quantite'));
 
     if (isNaN(qte) || qte <= 0) {
       await interaction.reply({ content: '❌ Quantité invalide.', ephemeral: true });
@@ -282,10 +274,14 @@ client.on('interactionCreate', async (interaction) => {
     if (!paniers.has(interaction.user.id)) paniers.set(interaction.user.id, []);
     const panier = paniers.get(interaction.user.id);
     const existing = panier.find(i => i.id === meubleId);
-    if (existing) { existing.qte += qte; } 
+    if (existing) { existing.qte += qte; }
     else { panier.push({ id: meubleId, nom: meuble.nom, qte, prix: meuble.prix }); }
 
-    await afficherPanier(interaction, false);
+    await interaction.reply({
+      embeds: [buildPanierEmbed(interaction.user.id)],
+      components: getPanierComponents(interaction.user.id),
+      ephemeral: true
+    });
   }
 
   // ── VALIDER COMMANDE ──
