@@ -238,7 +238,7 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  // ── CHOISIR MEUBLE → ouvre modal directement ──
+  // ── CHOISIR MEUBLE → ouvre modal ──
   if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble' || interaction.customId === 'choisir_meuble2')) {
     const meubleId = interaction.values[0];
     const meuble = catalogue[meubleId];
@@ -249,7 +249,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const input = new TextInputBuilder()
       .setCustomId('quantite')
-      .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien en voulez-vous ?`)
+      .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien ?`)
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('Ex: 2')
       .setMinLength(1)
@@ -260,7 +260,7 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // ── MODAL QUANTITÉ ──
+  // ── MODAL QUANTITÉ → met à jour le même message ──
   if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_qte_')) {
     const meubleId = interaction.customId.replace('modal_qte_', '');
     const meuble = catalogue[meubleId];
@@ -277,11 +277,20 @@ client.on('interactionCreate', async (interaction) => {
     if (existing) { existing.qte += qte; }
     else { panier.push({ id: meubleId, nom: meuble.nom, qte, prix: meuble.prix }); }
 
-    await interaction.reply({
-      embeds: [buildPanierEmbed(interaction.user.id)],
-      components: getPanierComponents(interaction.user.id),
-      ephemeral: true
-    });
+    // Mettre à jour le message existant au lieu d'en créer un nouveau
+    try {
+      await interaction.deferUpdate();
+      await interaction.editReply({
+        embeds: [buildPanierEmbed(interaction.user.id)],
+        components: getPanierComponents(interaction.user.id),
+      });
+    } catch (e) {
+      await interaction.reply({
+        embeds: [buildPanierEmbed(interaction.user.id)],
+        components: getPanierComponents(interaction.user.id),
+        ephemeral: true
+      });
+    }
   }
 
   // ── VALIDER COMMANDE ──
