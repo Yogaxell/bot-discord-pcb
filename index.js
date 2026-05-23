@@ -25,6 +25,17 @@ const client = new Client({
 
 const CATEGORIE_COMMANDES_ID = '1507304750641582102';
 const SALON_LOGS_PRODUCTION = '1507716933271945307';
+const ROLE_PDG = '1424397015411851322';
+const ROLE_COPDG = '1424397015411851321';
+const ROLE_RESTOKER = '1424397015411851319';
+
+function isPDGouCoPDG(member) {
+  return member.roles.cache.has(ROLE_PDG) || member.roles.cache.has(ROLE_COPDG);
+}
+
+function isRestoker(member) {
+  return member.roles.cache.has(ROLE_RESTOKER) || member.roles.cache.has(ROLE_PDG);
+}
 
 let prixRessources = {
   buche: 10,
@@ -255,7 +266,7 @@ client.on('messageCreate', async (message) => {
   const commande = args.shift().toLowerCase();
 
   if (commande === 'setup-vente') {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Réservé au PDG.');
+    if (!message.member.roles.cache.has(ROLE_PDG)) return message.reply('❌ Réservé au PDG.');
     const msg = await message.channel.send({ embeds: [buildCatalogueEmbed()], components: [buildCatalogueButtons()] });
     messageVenteId = msg.id;
     channelVenteId = message.channel.id;
@@ -263,7 +274,7 @@ client.on('messageCreate', async (message) => {
   }
 
   if (commande === 'setup-pdg') {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('❌ Réservé au PDG.');
+    if (!message.member.roles.cache.has(ROLE_PDG)) return message.reply('❌ Réservé au PDG.');
     const msg = await message.channel.send({ embeds: [buildPDGEmbed()], components: buildPDGButtons() });
     messagePDGId = msg.id;
     channelPDGId = message.channel.id;
@@ -356,8 +367,8 @@ client.on('interactionCreate', async (interaction) => {
 
   // ── CLÔTURER ──
   if (interaction.isButton() && interaction.customId.startsWith('cloturer_')) {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return interaction.reply({ content: '❌ Réservé au PDG.', ephemeral: true });
+    if (!isPDGouCoPDG(interaction.member)) {
+      return interaction.reply({ content: '❌ Réservé au PDG et Co-PDG.', ephemeral: true });
     }
     const salonId = interaction.customId.split('_')[1];
     await interaction.reply({ content: '🔒 Commande clôturée, suppression dans 5 secondes...' });
@@ -369,6 +380,9 @@ client.on('interactionCreate', async (interaction) => {
 
   // ── SOUMETTRE PRODUCTION ──
   if (interaction.isButton() && interaction.customId === 'soumettre_production') {
+    if (!isRestoker(interaction.member)) {
+      return interaction.reply({ content: '❌ Réservé aux Restokers.', ephemeral: true });
+    }
     const modal = new ModalBuilder()
       .setCustomId('modal_production')
       .setTitle('📋 Rapport de production');
@@ -481,7 +495,7 @@ client.on('interactionCreate', async (interaction) => {
 
   // ── BOUTONS PDG ──
   if (interaction.isButton() && ['set_buche', 'set_magnetite', 'set_cuivre', 'set_or'].includes(interaction.customId)) {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+    if (!interaction.member.roles.cache.has(ROLE_PDG)) {
       return interaction.reply({ content: '❌ Réservé au PDG.', ephemeral: true });
     }
     const type = interaction.customId.replace('set_', '');
@@ -492,7 +506,7 @@ client.on('interactionCreate', async (interaction) => {
 
   // ── ACTUALISER CATALOGUE ──
   if (interaction.isButton() && interaction.customId === 'actualiser_catalogue') {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+    if (!interaction.member.roles.cache.has(ROLE_PDG)) {
       return interaction.reply({ content: '❌ Réservé au PDG.', ephemeral: true });
     }
     messagePDGId = interaction.message.id;
