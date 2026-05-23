@@ -380,12 +380,12 @@ client.on('interactionCreate', async (interaction) => {
     const existing = panier.find(i => i.id === meubleId && i.couleur === couleurChoisie);
     if (existing) { existing.qte += qte; }
     else { panier.push({ id: meubleId, nom: nomFinal, couleur: couleurChoisie, qte, prix: prixFinal }); }
-    try {
-      await interaction.deferUpdate();
-      await interaction.editReply({ embeds: [buildPanierEmbed(interaction.user.id)], components: getPanierComponents(interaction.user.id) });
-    } catch (e) {
-      await interaction.reply({ embeds: [buildPanierEmbed(interaction.user.id)], components: getPanierComponents(interaction.user.id), ephemeral: true });
-    }
+    // Toujours reply (jamais update) pour éviter l'échec d'interaction
+    await interaction.reply({
+      embeds: [buildPanierEmbed(interaction.user.id)],
+      components: getPanierComponents(interaction.user.id),
+      ephemeral: true
+    });
   }
 
   // ── VALIDER COMMANDE ──
