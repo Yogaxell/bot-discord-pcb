@@ -326,23 +326,9 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  // ── MENUS MEUBLES ──
+  // ── MENUS MEUBLES → ouvre modal directement ──
   if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble_metal' || interaction.customId === 'choisir_meuble_bois')) {
     const meubleId = interaction.values[0];
-    const meuble = catalogue[meubleId];
-    // Stocker le choix et afficher bouton pour ouvrir le modal
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`ouvrir_modal_${meubleId}`)
-        .setLabel(`📝 Configurer : ${meuble.nom}`)
-        .setStyle(ButtonStyle.Primary),
-    );
-    await interaction.reply({ content: `Vous avez sélectionné **${meuble.nom}** (${meuble.prix}€). Cliquez ci-dessous pour choisir la quantité.`, components: [row], ephemeral: true });
-  }
-
-  // ── BOUTON OUVRIR MODAL ──
-  if (interaction.isButton() && interaction.customId.startsWith('ouvrir_modal_')) {
-    const meubleId = interaction.customId.replace('ouvrir_modal_', '');
     await ouvrirModal(interaction, meubleId);
   }
 
