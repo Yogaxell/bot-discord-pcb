@@ -418,11 +418,13 @@ client.on('interactionCreate', async (interaction) => {
     const or = parseInt(interaction.fields.getTextInputValue('or')) || 0;
     const magnetite = parseInt(interaction.fields.getTextInputValue('magnetite')) || 0;
 
-    // Calcul circuits imprimés
-    // Pour 2 circuits : 2 bûches, 6 pépites cuivre, 20 pépites or
+    // Calcul circuits imprimés (le jeu produit 2x le résultat Excel)
+    // Bûches : floor(bûches / 2) * 2
+    // Or : floor(or / 20) * 10 * 2
+    // Cuivre : floor(cuivre / 6) * 18 * 2
     const circuitsViaBuches = Math.floor(buches / 2) * 2;
-    const circuitsViaCuivre = Math.floor(cuivre / 6) * 2;
-    const circuitsViaOr = Math.floor(or / 20) * 2;
+    const circuitsViaCuivre = Math.floor(cuivre / 6) * 18 * 2;
+    const circuitsViaOr = Math.floor(or / 20) * 10 * 2;
     const nbCircuits = Math.min(circuitsViaBuches, circuitsViaCuivre, circuitsViaOr);
 
     // Coût total employé
