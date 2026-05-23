@@ -38,7 +38,7 @@ const catalogue = {
   "seau":              { nom: "Seau",                 categorie: "Métal",  prix: 45  },
   "barriere_vauban":   { nom: "Barrière Vauban",      categorie: "Métal",  prix: 32  },
   "bureau_industriel": { nom: "Bureau industriel",    categorie: "Métal",  prix: 210 },
-  "grand_casier":      { nom: "Grand casier",         categorie: "Métal",  prix: 320 },
+  "grand_casier":      { nom: "Grand casier",         categorie: "Métal",  prix: 310 },
   "evier_industriel":  { nom: "Évier industriel",     categorie: "Métal",  prix: 210 },
   "etagere_police":    { nom: "Étagère de police",    categorie: "Métal",  prix: 950 },
   "etagere_metal":     { nom: "Étagère métal",        categorie: "Métal",  prix: 150 },
