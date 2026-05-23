@@ -24,6 +24,7 @@ const client = new Client({
 });
 
 const CATEGORIE_COMMANDES_ID = '1507304750641582102';
+const SALON_LOGS_PRODUCTION = '1507716933271945307';
 
 let prixRessources = {
   buche: 10,
@@ -33,7 +34,6 @@ let prixRessources = {
 };
 
 const catalogue = {
-  // ── MÉTAL ──
   "chaise_metal":      { nom: "Chaise en métal",     categorie: "Métal",  prix: 75  },
   "fut_metal":         { nom: "Fût en métal",         categorie: "Métal",  prix: 85  },
   "seau":              { nom: "Seau",                 categorie: "Métal",  prix: 45  },
@@ -43,8 +43,6 @@ const catalogue = {
   "evier_industriel":  { nom: "Évier industriel",     categorie: "Métal",  prix: 210 },
   "etagere_police":    { nom: "Étagère de police",    categorie: "Métal",  prix: 950 },
   "etagere_metal":     { nom: "Étagère métal",        categorie: "Métal",  prix: 150 },
-
-  // ── BOIS / MIXTE ──
   "table_basse_bois":  { nom: "Table basse bois",     categorie: "Bois",   prix: 32  },
   "table":             { nom: "Table",                categorie: "Bois",   prix: 25  },
   "table_exterieur":   { nom: "Table extérieur bois", categorie: "Bois",   prix: 110 },
@@ -65,6 +63,9 @@ const catalogue = {
   "cagette_fruits":    { nom: "Cagette de fruits",    categorie: "Bois",   prix: 30  },
 };
 
+// Prix de vente d'un circuit imprimé
+const PRIX_CIRCUIT_IMPRIME = 200;
+
 const paniers = new Map();
 const attenteSaisie = new Map();
 
@@ -73,6 +74,9 @@ let messagePDGId = null;
 let channelVenteId = null;
 let channelPDGId = null;
 
+// ─────────────────────────────────────────────
+// BUILDERS CATALOGUE
+// ─────────────────────────────────────────────
 function buildCatalogueEmbed() {
   const parCategorie = {};
   for (const [id, meuble] of Object.entries(catalogue)) {
@@ -96,6 +100,9 @@ function buildCatalogueButtons() {
   );
 }
 
+// ─────────────────────────────────────────────
+// BUILDERS PDG
+// ─────────────────────────────────────────────
 function buildPDGEmbed() {
   return new EmbedBuilder()
     .setTitle('⚙️ Interface PDG — Gestion des prix')
@@ -123,6 +130,9 @@ function buildPDGButtons() {
   return [row1, row2];
 }
 
+// ─────────────────────────────────────────────
+// BUILDERS PANIER
+// ─────────────────────────────────────────────
 function buildPanierEmbed(userId) {
   const panier = paniers.get(userId) || [];
   const total = panier.reduce((acc, item) => acc + item.prix * item.qte, 0);
@@ -143,10 +153,7 @@ function buildMenuMetal() {
     new StringSelectMenuOptionBuilder().setLabel(m.nom).setValue(id).setDescription(`${m.prix}€`)
   );
   return new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId('choisir_meuble_metal')
-      .setPlaceholder('🔩 Meubles en métal...')
-      .addOptions(options)
+    new StringSelectMenuBuilder().setCustomId('choisir_meuble_metal').setPlaceholder('🔩 Meubles en métal...').addOptions(options)
   );
 }
 
@@ -156,10 +163,7 @@ function buildMenuBois() {
     new StringSelectMenuOptionBuilder().setLabel(m.nom).setValue(id).setDescription(`${m.prix}€`)
   );
   return new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId('choisir_meuble_bois')
-      .setPlaceholder('🪵 Meubles en bois...')
-      .addOptions(options)
+    new StringSelectMenuBuilder().setCustomId('choisir_meuble_bois').setPlaceholder('🪵 Meubles en bois...').addOptions(options)
   );
 }
 
@@ -185,13 +189,38 @@ async function ouvrirModal(interaction, meubleId) {
     .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien ?`)
     .setStyle(TextInputStyle.Short)
     .setPlaceholder('Ex: 2')
-    .setMinLength(1)
-    .setMaxLength(3)
-    .setRequired(true);
+    .setMinLength(1).setMaxLength(3).setRequired(true);
   modal.addComponents(new ActionRowBuilder().addComponents(input));
   await interaction.showModal(modal);
 }
 
+// ─────────────────────────────────────────────
+// PRODUCTION EMPLOYÉ
+// ─────────────────────────────────────────────
+function buildProductionEmbed() {
+  return new EmbedBuilder()
+    .setTitle('🏭 Rapport de production — Employé')
+    .setColor(0x57F287)
+    .setDescription(
+      'Entrez les ressources que vous avez achetées.\n\n' +
+      '**Circuits imprimés** (2 par session) :\n' +
+      '• 1 bûche = 1 caoutchouc\n' +
+      '• 1 bûche = 1 plastique\n' +
+      '• 6 pépites de cuivre = 1 lingot = 18 petites plaques\n' +
+      '• 20 pépites d\'or = 1 lingot = 10 petites plaques\n\n' +
+      'Cliquez sur **Soumettre mon rapport** pour calculer !'
+    );
+}
+
+function buildProductionButtons() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('soumettre_production').setLabel('📋 Soumettre mon rapport').setStyle(ButtonStyle.Success),
+  );
+}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
 client.once('ready', () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
 });
@@ -199,6 +228,7 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
+  // Saisie PDG prix ressources
   if (attenteSaisie.has(message.author.id)) {
     const { type } = attenteSaisie.get(message.author.id);
     const valeur = parseFloat(message.content.trim());
@@ -239,6 +269,11 @@ client.on('messageCreate', async (message) => {
     channelPDGId = message.channel.id;
     await message.delete().catch(() => {});
   }
+
+  if (commande === 'setup-production') {
+    const msg = await message.channel.send({ embeds: [buildProductionEmbed()], components: [buildProductionButtons()] });
+    await message.delete().catch(() => {});
+  }
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -253,13 +288,8 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  // ── CHOISIR MEUBLE MÉTAL ──
-  if (interaction.isStringSelectMenu() && interaction.customId === 'choisir_meuble_metal') {
-    await ouvrirModal(interaction, interaction.values[0]);
-  }
-
-  // ── CHOISIR MEUBLE BOIS ──
-  if (interaction.isStringSelectMenu() && interaction.customId === 'choisir_meuble_bois') {
+  // ── MENUS MEUBLES ──
+  if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble_metal' || interaction.customId === 'choisir_meuble_bois')) {
     await ouvrirModal(interaction, interaction.values[0]);
   }
 
@@ -268,30 +298,17 @@ client.on('interactionCreate', async (interaction) => {
     const meubleId = interaction.customId.replace('modal_qte_', '');
     const meuble = catalogue[meubleId];
     const qte = parseInt(interaction.fields.getTextInputValue('quantite'));
-
-    if (isNaN(qte) || qte <= 0) {
-      await interaction.reply({ content: '❌ Quantité invalide.', ephemeral: true });
-      return;
-    }
-
+    if (isNaN(qte) || qte <= 0) { await interaction.reply({ content: '❌ Quantité invalide.', ephemeral: true }); return; }
     if (!paniers.has(interaction.user.id)) paniers.set(interaction.user.id, []);
     const panier = paniers.get(interaction.user.id);
     const existing = panier.find(i => i.id === meubleId);
     if (existing) { existing.qte += qte; }
     else { panier.push({ id: meubleId, nom: meuble.nom, qte, prix: meuble.prix }); }
-
     try {
       await interaction.deferUpdate();
-      await interaction.editReply({
-        embeds: [buildPanierEmbed(interaction.user.id)],
-        components: getPanierComponents(interaction.user.id),
-      });
+      await interaction.editReply({ embeds: [buildPanierEmbed(interaction.user.id)], components: getPanierComponents(interaction.user.id) });
     } catch (e) {
-      await interaction.reply({
-        embeds: [buildPanierEmbed(interaction.user.id)],
-        components: getPanierComponents(interaction.user.id),
-        ephemeral: true
-      });
+      await interaction.reply({ embeds: [buildPanierEmbed(interaction.user.id)], components: getPanierComponents(interaction.user.id), ephemeral: true });
     }
   }
 
@@ -299,11 +316,9 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton() && interaction.customId === 'valider_commande') {
     const panier = paniers.get(interaction.user.id) || [];
     if (panier.length === 0) return interaction.reply({ content: '❌ Panier vide.', ephemeral: true });
-
     const guild = interaction.guild;
     const member = interaction.member;
     const total = panier.reduce((acc, item) => acc + item.prix * item.qte, 0);
-
     const salon = await guild.channels.create({
       name: `commande-${member.user.username}`,
       type: ChannelType.GuildText,
@@ -314,7 +329,6 @@ client.on('interactionCreate', async (interaction) => {
         { id: guild.members.me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
       ],
     });
-
     const lignes = panier.map(item => `• ${item.nom} × ${item.qte} = **${item.prix * item.qte}€**`).join('\n');
     const embed = new EmbedBuilder()
       .setTitle('🛒 Nouvelle commande')
@@ -324,16 +338,12 @@ client.on('interactionCreate', async (interaction) => {
         { name: 'Meubles commandés', value: lignes },
         { name: '💰 Total', value: `**${total}€**` },
       )
-      .setTimestamp()
-      .setFooter({ text: 'PCB & Co' });
-
+      .setTimestamp().setFooter({ text: 'PCB & Co' });
     const rowSalon = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`cloturer_${salon.id}`).setLabel('🔒 Clôturer la commande').setStyle(ButtonStyle.Danger),
     );
-
     await salon.send({ embeds: [embed], components: [rowSalon] });
     await salon.send(`Bonjour <@${member.id}> ! Votre commande a été enregistrée. Total : **${total}€**. Un membre de l'équipe vous contactera bientôt.`);
-
     paniers.delete(interaction.user.id);
     await interaction.update({ content: `✅ Commande validée ! Rendez-vous dans <#${salon.id}>`, embeds: [], components: [] });
   }
@@ -355,6 +365,116 @@ client.on('interactionCreate', async (interaction) => {
       const ch = interaction.guild.channels.cache.get(salonId);
       if (ch) await ch.delete().catch(() => {});
     }, 5000);
+  }
+
+  // ── SOUMETTRE PRODUCTION ──
+  if (interaction.isButton() && interaction.customId === 'soumettre_production') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_production')
+      .setTitle('📋 Rapport de production');
+
+    const inputBuches = new TextInputBuilder()
+      .setCustomId('buches')
+      .setLabel(`Nombre de bûches achetées (${prixRessources.buche}€/u)`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 200')
+      .setRequired(true);
+
+    const inputCuivre = new TextInputBuilder()
+      .setCustomId('cuivre')
+      .setLabel(`Pépites de cuivre achetées (${prixRessources.pepiteCuivre}€/u)`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 36')
+      .setRequired(true);
+
+    const inputOr = new TextInputBuilder()
+      .setCustomId('or')
+      .setLabel(`Pépites d'or achetées (${prixRessources.pepiteOr}€/u)`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 200')
+      .setRequired(true);
+
+    const inputMagnetite = new TextInputBuilder()
+      .setCustomId('magnetite')
+      .setLabel(`Pépites de magnétite achetées (${prixRessources.pepiteMagnetite}€/u)`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 0 (mettre 0 si aucune)')
+      .setRequired(true);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(inputBuches),
+      new ActionRowBuilder().addComponents(inputCuivre),
+      new ActionRowBuilder().addComponents(inputOr),
+      new ActionRowBuilder().addComponents(inputMagnetite),
+    );
+
+    await interaction.showModal(modal);
+  }
+
+  // ── MODAL PRODUCTION ──
+  if (interaction.isModalSubmit() && interaction.customId === 'modal_production') {
+    const buches = parseInt(interaction.fields.getTextInputValue('buches')) || 0;
+    const cuivre = parseInt(interaction.fields.getTextInputValue('cuivre')) || 0;
+    const or = parseInt(interaction.fields.getTextInputValue('or')) || 0;
+    const magnetite = parseInt(interaction.fields.getTextInputValue('magnetite')) || 0;
+
+    // Calcul circuits imprimés
+    // Pour 2 circuits : 2 bûches, 6 pépites cuivre, 20 pépites or
+    const circuitsViaBuches = Math.floor(buches / 2) * 2;
+    const circuitsViaCuivre = Math.floor(cuivre / 6) * 2;
+    const circuitsViaOr = Math.floor(or / 20) * 2;
+    const nbCircuits = Math.min(circuitsViaBuches, circuitsViaCuivre, circuitsViaOr);
+
+    // Coût total employé
+    const coutBuches = buches * prixRessources.buche;
+    const coutCuivre = cuivre * prixRessources.pepiteCuivre;
+    const coutOr = or * prixRessources.pepiteOr;
+    const coutMagnetite = magnetite * prixRessources.pepiteMagnetite;
+    const coutTotal = coutBuches + coutCuivre + coutOr + coutMagnetite;
+
+    // Chiffre d'affaires
+    const ca = nbCircuits * PRIX_CIRCUIT_IMPRIME;
+
+    // Embed résultat pour l'employé
+    const embedResultat = new EmbedBuilder()
+      .setTitle('✅ Rapport de production calculé')
+      .setColor(0x57F287)
+      .addFields(
+        { name: '📦 Ressources achetées', value:
+          `• Bûches : ${buches} × ${prixRessources.buche}€ = **${coutBuches}€**\n` +
+          `• Pépites de cuivre : ${cuivre} × ${prixRessources.pepiteCuivre}€ = **${coutCuivre}€**\n` +
+          `• Pépites d'or : ${or} × ${prixRessources.pepiteOr}€ = **${coutOr}€**\n` +
+          `• Pépites de magnétite : ${magnetite} × ${prixRessources.pepiteMagnetite}€ = **${coutMagnetite}€**`
+        },
+        { name: '💸 Total dépensé (à rembourser)', value: `**${coutTotal}€**`, inline: true },
+        { name: '🔌 Circuits imprimés fabriqués', value: `**${nbCircuits}**`, inline: true },
+        { name: '💰 CA généré pour l\'entreprise', value: `**${ca}€**`, inline: true },
+      )
+      .setTimestamp()
+      .setFooter({ text: `Rapport de ${interaction.user.username}` });
+
+    await interaction.reply({ embeds: [embedResultat], ephemeral: true });
+
+    // Log dans le salon production
+    try {
+      const logChannel = await interaction.client.channels.fetch(SALON_LOGS_PRODUCTION);
+      const embedLog = new EmbedBuilder()
+        .setTitle('🏭 Nouveau rapport de production')
+        .setColor(0x5865F2)
+        .addFields(
+          { name: 'Employé', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '🔌 Circuits fabriqués', value: `**${nbCircuits}**`, inline: true },
+          { name: '💰 CA généré', value: `**${ca}€**`, inline: true },
+          { name: '💸 À rembourser', value: `**${coutTotal}€**`, inline: true },
+          { name: '📦 Détail ressources', value:
+            `Bûches: ${buches} | Cuivre: ${cuivre} | Or: ${or} | Magnétite: ${magnetite}`
+          },
+        )
+        .setTimestamp();
+      await logChannel.send({ embeds: [embedLog] });
+    } catch (e) {
+      console.error('Erreur envoi log production:', e);
+    }
   }
 
   // ── BOUTONS PDG ──
