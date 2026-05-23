@@ -366,7 +366,8 @@ client.on('interactionCreate', async (interaction) => {
     const existing = panier.find(i => i.id === meubleId && i.couleur === couleurChoisie);
     if (existing) { existing.qte += qte; }
     else { panier.push({ id: meubleId, nom: nomFinal, couleur: couleurChoisie, qte, prix: prixFinal }); }
-    // Toujours reply (jamais update) pour éviter l'échec d'interaction
+    // Supprimer l'ancien message et en créer un nouveau propre
+    try { await interaction.message?.delete().catch(() => {}); } catch(e) {}
     await interaction.reply({
       embeds: [buildPanierEmbed(interaction.user.id)],
       components: getPanierComponents(interaction.user.id),
