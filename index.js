@@ -212,23 +212,26 @@ async function ouvrirModal(interaction, meubleId) {
   const couleurs = couleursMeubles[meubleId];
   const modal = new ModalBuilder()
     .setCustomId(`modal_qte_${meubleId}`)
-    .setTitle(`${meuble.nom} — Quantité`);
+    .setTitle(`${meuble.nom}`);
+
   const inputQte = new TextInputBuilder()
     .setCustomId('quantite')
-    .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien ?`)
+    .setLabel(`Quantité (prix: ${meuble.prix}€/u)`)
     .setStyle(TextInputStyle.Short)
     .setPlaceholder('Ex: 2')
     .setMinLength(1).setMaxLength(3).setRequired(true);
   modal.addComponents(new ActionRowBuilder().addComponents(inputQte));
+
   if (couleurs) {
     const inputCouleur = new TextInputBuilder()
       .setCustomId('couleur')
-      .setLabel(`Couleur ? (${couleurs.couleurs.join(', ')})`)
+      .setLabel(`Couleur: ${couleurs.couleurs.join(', ')}`)
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: Bleu (laisser vide si sans couleur)')
-      .setRequired(false);
+      .setPlaceholder('Ex: Bleu')
+      .setMinLength(1).setMaxLength(10).setRequired(true);
     modal.addComponents(new ActionRowBuilder().addComponents(inputCouleur));
   }
+
   await interaction.showModal(modal);
 }
 
