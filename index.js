@@ -28,6 +28,7 @@ const SALON_LOGS_PRODUCTION = '1507716933271945307';
 const ROLE_PDG = '1424397015411851322';
 const ROLE_COPDG = '1424397015411851321';
 const ROLE_RESTOKER = '1424397015411851319';
+const ROLE_EMPLOYE = '1507134162124013668';
 
 function isPDGouCoPDG(member) {
   return member.roles.cache.has(ROLE_PDG) || member.roles.cache.has(ROLE_COPDG);
@@ -72,6 +73,29 @@ const catalogue = {
   "etagere_murale":    { nom: "Étagère murale",       categorie: "Mixte",  prix: 35  },
   "etagere_murale_18": { nom: "Étagère murale 1.8m",  categorie: "Mixte",  prix: 45  },
   "cagette_fruits":    { nom: "Cagette de fruits",    categorie: "Bois",   prix: 30  },
+};
+
+// Couleurs disponibles par meuble (prix pot de peinture = 25€)
+const PRIX_PEINTURE = 25;
+const couleursMeubles = {
+  // Métal : bleu, rouge, vert
+  "chaise_metal":      { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "fut_metal":         { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "etagere_metal":     { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "seau":              { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "bureau_industriel": { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "grand_casier":      { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "evier_industriel":  { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "etagere_police":    { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  "barriere_vauban":   { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  // Bois
+  "chaise_bois":       { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
+  "table_nuit_1":      { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
+  "table_nuit_2":      { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
+  "table_nuit_3":      { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
+  "tabouret_bois":     { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
+  "caisse_bois":       { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose", "Camo"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2, "Camo": 2 } },
+  "table_basse_bois":  { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2 } },
 };
 
 // Prix de vente d'un circuit imprimé
@@ -192,16 +216,26 @@ function getPanierComponents(userId) {
 
 async function ouvrirModal(interaction, meubleId) {
   const meuble = catalogue[meubleId];
+  const couleurs = couleursMeubles[meubleId];
   const modal = new ModalBuilder()
     .setCustomId(`modal_qte_${meubleId}`)
     .setTitle(`${meuble.nom} — Quantité`);
-  const input = new TextInputBuilder()
+  const inputQte = new TextInputBuilder()
     .setCustomId('quantite')
     .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien ?`)
     .setStyle(TextInputStyle.Short)
     .setPlaceholder('Ex: 2')
     .setMinLength(1).setMaxLength(3).setRequired(true);
-  modal.addComponents(new ActionRowBuilder().addComponents(input));
+  modal.addComponents(new ActionRowBuilder().addComponents(inputQte));
+  if (couleurs) {
+    const inputCouleur = new TextInputBuilder()
+      .setCustomId('couleur')
+      .setLabel(`Couleur ? (${couleurs.couleurs.join(', ')})`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: Bleu (laisser vide si sans couleur)')
+      .setRequired(false);
+    modal.addComponents(new ActionRowBuilder().addComponents(inputCouleur));
+  }
   await interaction.showModal(modal);
 }
 
@@ -310,11 +344,34 @@ client.on('interactionCreate', async (interaction) => {
     const meuble = catalogue[meubleId];
     const qte = parseInt(interaction.fields.getTextInputValue('quantite'));
     if (isNaN(qte) || qte <= 0) { await interaction.reply({ content: '❌ Quantité invalide.', ephemeral: true }); return; }
+
+    // Gestion couleur
+    let couleurChoisie = null;
+    let prixPeinture = 0;
+    const couleursDispo = couleursMeubles[meubleId];
+    try {
+      const couleurInput = interaction.fields.getTextInputValue('couleur').trim();
+      if (couleurInput && couleursDispo) {
+        const couleurNormalisee = couleurInput.charAt(0).toUpperCase() + couleurInput.slice(1).toLowerCase();
+        if (couleursDispo.couleurs.includes(couleurNormalisee)) {
+          couleurChoisie = couleurNormalisee;
+          const nbPots = couleursDispo.pots[couleurNormalisee] || 1;
+          prixPeinture = nbPots * PRIX_PEINTURE * qte;
+        } else {
+          await interaction.reply({ content: `❌ Couleur invalide. Couleurs disponibles : ${couleursDispo.couleurs.join(', ')}`, ephemeral: true });
+          return;
+        }
+      }
+    } catch(e) {}
+
+    const prixFinal = meuble.prix + (prixPeinture / qte);
+    const nomFinal = couleurChoisie ? `${meuble.nom} (${couleurChoisie})` : meuble.nom;
+
     if (!paniers.has(interaction.user.id)) paniers.set(interaction.user.id, []);
     const panier = paniers.get(interaction.user.id);
-    const existing = panier.find(i => i.id === meubleId);
+    const existing = panier.find(i => i.id === meubleId && i.couleur === couleurChoisie);
     if (existing) { existing.qte += qte; }
-    else { panier.push({ id: meubleId, nom: meuble.nom, qte, prix: meuble.prix }); }
+    else { panier.push({ id: meubleId, nom: nomFinal, couleur: couleurChoisie, qte, prix: prixFinal }); }
     try {
       await interaction.deferUpdate();
       await interaction.editReply({ embeds: [buildPanierEmbed(interaction.user.id)], components: getPanierComponents(interaction.user.id) });
@@ -338,6 +395,9 @@ client.on('interactionCreate', async (interaction) => {
         { id: guild.roles.everyone, deny: [PermissionsBitField.Flags.ViewChannel] },
         { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
         { id: guild.members.me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        { id: ROLE_EMPLOYE, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        { id: ROLE_PDG, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] },
+        { id: ROLE_COPDG, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] },
       ],
     });
     const lignes = panier.map(item => `• ${item.nom} × ${item.qte} = **${item.prix * item.qte}€**`).join('\n');
