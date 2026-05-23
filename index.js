@@ -78,24 +78,17 @@ const catalogue = {
 // Couleurs disponibles par meuble (prix pot de peinture = 25€)
 const PRIX_PEINTURE = 25;
 const couleursMeubles = {
-  // Métal : bleu, rouge, vert
-  "chaise_metal":      { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "fut_metal":         { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "etagere_metal":     { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "seau":              { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "bureau_industriel": { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "grand_casier":      { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "evier_industriel":  { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "etagere_police":    { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
-  "barriere_vauban":   { couleurs: ["Bleu", "Rouge", "Vert"], pots: { "Bleu": 1, "Rouge": 1, "Vert": 1 } },
+  // Métal
+  "chaise_metal":  { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
+  "fut_metal":     { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
   // Bois
-  "chaise_bois":       { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
-  "table_nuit_1":      { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
-  "table_nuit_2":      { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
-  "table_nuit_3":      { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
-  "tabouret_bois":     { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
-  "caisse_bois":       { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose", "Camo"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2, "Camo": 2 } },
-  "table_basse_bois":  { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2 } },
+  "cajot":         { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
+  "table_nuit_1":  { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
+  "table_nuit_2":  { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
+  "volet_bois":    { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
+  "caisse_bois":   { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose", "Camo"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2, "Camo": 2 } },
+  "tabouret_bois": { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
+  "table_basse_bois": { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2 } },
 };
 
 // Prix de vente d'un circuit imprimé
