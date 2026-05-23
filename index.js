@@ -33,6 +33,7 @@ let prixRessources = {
 };
 
 const catalogue = {
+  // ── MÉTAL ──
   "chaise_metal":      { nom: "Chaise en métal",     categorie: "Métal",  prix: 75  },
   "fut_metal":         { nom: "Fût en métal",         categorie: "Métal",  prix: 85  },
   "seau":              { nom: "Seau",                 categorie: "Métal",  prix: 45  },
@@ -42,6 +43,8 @@ const catalogue = {
   "evier_industriel":  { nom: "Évier industriel",     categorie: "Métal",  prix: 210 },
   "etagere_police":    { nom: "Étagère de police",    categorie: "Métal",  prix: 950 },
   "etagere_metal":     { nom: "Étagère métal",        categorie: "Métal",  prix: 150 },
+
+  // ── BOIS / MIXTE ──
   "table_basse_bois":  { nom: "Table basse bois",     categorie: "Bois",   prix: 32  },
   "table":             { nom: "Table",                categorie: "Bois",   prix: 25  },
   "table_exterieur":   { nom: "Table extérieur bois", categorie: "Bois",   prix: 110 },
@@ -125,7 +128,7 @@ function buildPanierEmbed(userId) {
   const total = panier.reduce((acc, item) => acc + item.prix * item.qte, 0);
   const embed = new EmbedBuilder().setTitle('🛒 Votre commande en cours').setColor(0x5865F2);
   if (panier.length === 0) {
-    embed.setDescription('Votre panier est vide.\n\n👇 Sélectionnez un meuble dans le menu ci-dessous.');
+    embed.setDescription('Votre panier est vide.\n\n👇 Sélectionnez un meuble dans les menus ci-dessous.');
   } else {
     const lignes = panier.map(item => `• ${item.nom} × ${item.qte} = **${item.prix * item.qte}€**`).join('\n');
     embed.setDescription(lignes + '\n\n👇 Ajoutez un autre meuble ou validez votre commande.');
@@ -134,29 +137,28 @@ function buildPanierEmbed(userId) {
   return embed;
 }
 
-function buildMenuMeubles() {
-  const entries = Object.entries(catalogue).slice(0, 25);
+function buildMenuMetal() {
+  const entries = Object.entries(catalogue).filter(([id, m]) => m.categorie === 'Métal');
   const options = entries.map(([id, m]) =>
     new StringSelectMenuOptionBuilder().setLabel(m.nom).setValue(id).setDescription(`${m.prix}€`)
   );
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId('choisir_meuble')
-      .setPlaceholder('👉 Choisissez un meuble...')
+      .setCustomId('choisir_meuble_metal')
+      .setPlaceholder('🔩 Meubles en métal...')
       .addOptions(options)
   );
 }
 
-function buildMenuMeubles2() {
-  const entries = Object.entries(catalogue).slice(25);
-  if (entries.length === 0) return null;
+function buildMenuBois() {
+  const entries = Object.entries(catalogue).filter(([id, m]) => m.categorie === 'Bois' || m.categorie === 'Mixte');
   const options = entries.map(([id, m]) =>
     new StringSelectMenuOptionBuilder().setLabel(m.nom).setValue(id).setDescription(`${m.prix}€`)
   );
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId('choisir_meuble2')
-      .setPlaceholder('👉 Suite du catalogue...')
+      .setCustomId('choisir_meuble_bois')
+      .setPlaceholder('🪵 Meubles en bois...')
       .addOptions(options)
   );
 }
@@ -170,11 +172,24 @@ function buildPanierButtons(userId) {
 }
 
 function getPanierComponents(userId) {
-  const components = [buildMenuMeubles()];
-  const menu2 = buildMenuMeubles2();
-  if (menu2) components.push(menu2);
-  components.push(buildPanierButtons(userId));
-  return components;
+  return [buildMenuMetal(), buildMenuBois(), buildPanierButtons(userId)];
+}
+
+async function ouvrirModal(interaction, meubleId) {
+  const meuble = catalogue[meubleId];
+  const modal = new ModalBuilder()
+    .setCustomId(`modal_qte_${meubleId}`)
+    .setTitle(`${meuble.nom} — Quantité`);
+  const input = new TextInputBuilder()
+    .setCustomId('quantite')
+    .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien ?`)
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Ex: 2')
+    .setMinLength(1)
+    .setMaxLength(3)
+    .setRequired(true);
+  modal.addComponents(new ActionRowBuilder().addComponents(input));
+  await interaction.showModal(modal);
 }
 
 client.once('ready', () => {
@@ -238,29 +253,17 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  // ── CHOISIR MEUBLE → ouvre modal ──
-  if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble' || interaction.customId === 'choisir_meuble2')) {
-    const meubleId = interaction.values[0];
-    const meuble = catalogue[meubleId];
-
-    const modal = new ModalBuilder()
-      .setCustomId(`modal_qte_${meubleId}`)
-      .setTitle(`${meuble.nom} — Quantité`);
-
-    const input = new TextInputBuilder()
-      .setCustomId('quantite')
-      .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien ?`)
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 2')
-      .setMinLength(1)
-      .setMaxLength(3)
-      .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    await interaction.showModal(modal);
+  // ── CHOISIR MEUBLE MÉTAL ──
+  if (interaction.isStringSelectMenu() && interaction.customId === 'choisir_meuble_metal') {
+    await ouvrirModal(interaction, interaction.values[0]);
   }
 
-  // ── MODAL QUANTITÉ → met à jour le même message ──
+  // ── CHOISIR MEUBLE BOIS ──
+  if (interaction.isStringSelectMenu() && interaction.customId === 'choisir_meuble_bois') {
+    await ouvrirModal(interaction, interaction.values[0]);
+  }
+
+  // ── MODAL QUANTITÉ ──
   if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_qte_')) {
     const meubleId = interaction.customId.replace('modal_qte_', '');
     const meuble = catalogue[meubleId];
@@ -277,7 +280,6 @@ client.on('interactionCreate', async (interaction) => {
     if (existing) { existing.qte += qte; }
     else { panier.push({ id: meubleId, nom: meuble.nom, qte, prix: meuble.prix }); }
 
-    // Mettre à jour le message existant au lieu d'en créer un nouveau
     try {
       await interaction.deferUpdate();
       await interaction.editReply({
