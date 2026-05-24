@@ -206,22 +206,19 @@ function buildPanierButtons(userId) {
 }
 
 async function mettreAJourPanier(interaction, userId) {
+  // Supprimer l'ancien message panier s'il existe
   const msg = messagesParier.get(userId);
   if (msg) {
-    try {
-      await interaction.followUp({
-        embeds: [buildPanierEmbed(userId)],
-        components: getPanierComponents(userId),
-        ephemeral: true
-      });
-      return;
-    } catch(e) {}
+    try { await msg.delete(); } catch(e) {}
   }
-  await interaction.reply({
+  // Créer un nouveau message panier
+  const newMsg = await interaction.reply({
     embeds: [buildPanierEmbed(userId)],
     components: getPanierComponents(userId),
-    ephemeral: true
+    ephemeral: true,
+    fetchReply: true
   });
+  messagesParier.set(userId, newMsg);
 }
 
 function getPanierComponents(userId) {
