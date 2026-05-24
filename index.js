@@ -96,6 +96,7 @@ const PRIX_CIRCUIT_IMPRIME = 200;
 
 const paniers = new Map();
 const attenteSaisie = new Map();
+const choixEnCours = new Map(); // userId -> { meubleId, qte }
 
 let messageVenteId = null;
 let messagePDGId = null;
@@ -209,11 +210,9 @@ function getPanierComponents(userId) {
 
 async function ouvrirModal(interaction, meubleId) {
   const meuble = catalogue[meubleId];
-  const couleurs = couleursMeubles[meubleId];
   const modal = new ModalBuilder()
     .setCustomId(`modal_qte_${meubleId}`)
-    .setTitle(`${meuble.nom}`);
-
+    .setTitle(`${meuble.nom} — Quantité`);
   const inputQte = new TextInputBuilder()
     .setCustomId('quantite')
     .setLabel(`Quantité (prix: ${meuble.prix}€/u)`)
@@ -221,18 +220,21 @@ async function ouvrirModal(interaction, meubleId) {
     .setPlaceholder('Ex: 2')
     .setMinLength(1).setMaxLength(3).setRequired(true);
   modal.addComponents(new ActionRowBuilder().addComponents(inputQte));
-
-  if (couleurs) {
-    const inputCouleur = new TextInputBuilder()
-      .setCustomId('couleur')
-      .setLabel(`Couleur: ${couleurs.couleurs.join(', ')}`)
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: Bleu')
-      .setMinLength(1).setMaxLength(10).setRequired(true);
-    modal.addComponents(new ActionRowBuilder().addComponents(inputCouleur));
-  }
-
   await interaction.showModal(modal);
+}
+
+function buildMenuCouleurs(meubleId) {
+  const couleurs = couleursMeubles[meubleId];
+  if (!couleurs) return null;
+  const options = couleurs.couleurs.map(c =>
+    new StringSelectMenuOptionBuilder().setLabel(c).setValue(c)
+  );
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`choisir_couleur_${meubleId}`)
+      .setPlaceholder('🎨 Choisissez une couleur...')
+      .addOptions(options)
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -342,35 +344,52 @@ client.on('interactionCreate', async (interaction) => {
     const qte = parseInt(interaction.fields.getTextInputValue('quantite'));
     if (isNaN(qte) || qte <= 0) { await interaction.reply({ content: '❌ Quantité invalide.', ephemeral: true }); return; }
 
-    // Gestion couleur
-    let couleurChoisie = null;
-    let prixPeinture = 0;
+    if (!paniers.has(interaction.user.id)) paniers.set(interaction.user.id, []);
+    const panier = paniers.get(interaction.user.id);
+    const existing = panier.find(i => i.id === meubleId && !i.couleur);
+    if (existing) { existing.qte += qte; }
+    else { panier.push({ id: meubleId, nom: meuble.nom, couleur: null, qte, prix: meuble.prix }); }
     const couleursDispo = couleursMeubles[meubleId];
-    try {
-      const couleurInput = interaction.fields.getTextInputValue('couleur').trim();
-      if (couleurInput && couleursDispo) {
-        const couleurNormalisee = couleurInput.charAt(0).toUpperCase() + couleurInput.slice(1).toLowerCase();
-        if (couleursDispo.couleurs.includes(couleurNormalisee)) {
-          couleurChoisie = couleurNormalisee;
-          const nbPots = couleursDispo.pots[couleurNormalisee] || 1;
-          prixPeinture = nbPots * PRIX_PEINTURE * qte;
-        } else {
-          await interaction.reply({ content: `❌ Couleur invalide. Couleurs disponibles : ${couleursDispo.couleurs.join(', ')}`, ephemeral: true });
-          return;
-        }
-      }
-    } catch(e) {}
+    if (couleursDispo) {
+      // Stocker le choix et afficher menu couleur
+      choixEnCours.set(interaction.user.id, { meubleId, qte, nomMeuble: meuble.nom, prixMeuble: meuble.prix });
+      const menuCouleur = buildMenuCouleurs(meubleId);
+      await interaction.reply({
+        content: `**${meuble.nom} × ${qte}** — Choisissez maintenant la couleur :`,
+        components: [menuCouleur],
+        ephemeral: true
+      });
+    } else {
+      // Pas de couleur, ajouter directement au panier
+      await interaction.reply({
+        embeds: [buildPanierEmbed(interaction.user.id)],
+        components: getPanierComponents(interaction.user.id),
+        ephemeral: true
+      });
+    }
+  }
 
-    const prixFinal = meuble.prix + (prixPeinture / qte);
-    const nomFinal = couleurChoisie ? `${meuble.nom} (${couleurChoisie})` : meuble.nom;
+  // ── MENU COULEUR ──
+  if (interaction.isStringSelectMenu() && interaction.customId.startsWith('choisir_couleur_')) {
+    const meubleId = interaction.customId.replace('choisir_couleur_', '');
+    const couleurChoisie = interaction.values[0];
+    const choix = choixEnCours.get(interaction.user.id);
+    if (!choix) return interaction.reply({ content: '❌ Session expirée, recommence.', ephemeral: true });
+
+    const couleursDispo = couleursMeubles[meubleId];
+    const nbPots = couleursDispo.pots[couleurChoisie] || 1;
+    const prixPeinture = nbPots * PRIX_PEINTURE;
+    const prixFinal = choix.prixMeuble + prixPeinture;
+    const nomFinal = `${choix.nomMeuble} (${couleurChoisie})`;
 
     if (!paniers.has(interaction.user.id)) paniers.set(interaction.user.id, []);
     const panier = paniers.get(interaction.user.id);
     const existing = panier.find(i => i.id === meubleId && i.couleur === couleurChoisie);
-    if (existing) { existing.qte += qte; }
-    else { panier.push({ id: meubleId, nom: nomFinal, couleur: couleurChoisie, qte, prix: prixFinal }); }
-    // Supprimer l'ancien message et en créer un nouveau propre
-    try { await interaction.message?.delete().catch(() => {}); } catch(e) {}
+    if (existing) { existing.qte += choix.qte; }
+    else { panier.push({ id: meubleId, nom: nomFinal, couleur: couleurChoisie, qte: choix.qte, prix: prixFinal }); }
+
+    choixEnCours.delete(interaction.user.id);
+
     await interaction.reply({
       embeds: [buildPanierEmbed(interaction.user.id)],
       components: getPanierComponents(interaction.user.id),
