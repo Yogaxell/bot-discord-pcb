@@ -97,6 +97,7 @@ const PRIX_CIRCUIT_IMPRIME = 200;
 const paniers = new Map();
 const attenteSaisie = new Map();
 const choixEnCours = new Map(); // userId -> { meubleId, qte }
+const messagesParier = new Map(); // userId -> message panier
 
 let messageVenteId = null;
 let messagePDGId = null;
@@ -202,6 +203,25 @@ function buildPanierButtons(userId) {
     new ButtonBuilder().setCustomId('valider_commande').setLabel('✅ Valider la commande').setStyle(ButtonStyle.Success).setDisabled(panier.length === 0),
     new ButtonBuilder().setCustomId('annuler_commande').setLabel('❌ Annuler').setStyle(ButtonStyle.Danger),
   );
+}
+
+async function mettreAJourPanier(interaction, userId) {
+  const msg = messagesParier.get(userId);
+  if (msg) {
+    try {
+      await interaction.followUp({
+        embeds: [buildPanierEmbed(userId)],
+        components: getPanierComponents(userId),
+        ephemeral: true
+      });
+      return;
+    } catch(e) {}
+  }
+  await interaction.reply({
+    embeds: [buildPanierEmbed(userId)],
+    components: getPanierComponents(userId),
+    ephemeral: true
+  });
 }
 
 function getPanierComponents(userId) {
@@ -324,11 +344,13 @@ client.on('interactionCreate', async (interaction) => {
   // ── PASSER COMMANDE ──
   if (interaction.isButton() && interaction.customId === 'passer_commande') {
     paniers.set(interaction.user.id, []);
-    await interaction.reply({
+    const msg = await interaction.reply({
       embeds: [buildPanierEmbed(interaction.user.id)],
       components: getPanierComponents(interaction.user.id),
-      ephemeral: true
+      ephemeral: true,
+      fetchReply: true
     });
+    messagesParier.set(interaction.user.id, msg);
   }
 
   // ── MENUS MEUBLES → ouvre modal directement ──
@@ -389,12 +411,7 @@ client.on('interactionCreate', async (interaction) => {
     else { panier.push({ id: meubleId, nom: nomFinal, couleur: couleurChoisie, qte: choix.qte, prix: prixFinal }); }
 
     choixEnCours.delete(interaction.user.id);
-
-    await interaction.reply({
-      embeds: [buildPanierEmbed(interaction.user.id)],
-      components: getPanierComponents(interaction.user.id),
-      ephemeral: true
-    });
+    await mettreAJourPanier(interaction, interaction.user.id);
   }
 
   // ── VALIDER COMMANDE ──
