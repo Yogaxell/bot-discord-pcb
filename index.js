@@ -1,4 +1,3 @@
-cat > /mnt/user-data/outputs/index.js << 'EOF'
 const {
   Client,
   GatewayIntentBits,
@@ -449,4 +448,3 @@ client.on('interactionCreate', async (interaction) => {
 const token = process.env.TOKEN;
 console.log("Token trouvé:", token ? "OUI" : "NON");
 client.login(token);
-EOF
