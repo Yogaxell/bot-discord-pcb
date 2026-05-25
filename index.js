@@ -1,3 +1,4 @@
+cat > /mnt/user-data/outputs/index.js << 'EOF'
 const {
   Client,
   GatewayIntentBits,
@@ -25,6 +26,7 @@ const client = new Client({
 
 const CATEGORIE_COMMANDES_ID = '1507304750641582102';
 const SALON_LOGS_PRODUCTION = '1507716933271945307';
+
 const ROLE_PDG = '1424397015411851322';
 const ROLE_COPDG = '1424397015411851321';
 const ROLE_RESTOKER = '1424397015411851319';
@@ -33,7 +35,6 @@ const ROLE_EMPLOYE = '1507134162124013668';
 function isPDGouCoPDG(member) {
   return member.roles.cache.has(ROLE_PDG) || member.roles.cache.has(ROLE_COPDG);
 }
-
 function isRestoker(member) {
   return member.roles.cache.has(ROLE_RESTOKER) || member.roles.cache.has(ROLE_PDG);
 }
@@ -75,38 +76,15 @@ const catalogue = {
   "cagette_fruits":    { nom: "Cagette de fruits",    categorie: "Bois",   prix: 30  },
 };
 
-// Couleurs disponibles par meuble (prix pot de peinture = 25€)
-const PRIX_PEINTURE = 25;
-const couleursMeubles = {
-  // Métal
-  "chaise_metal":  { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
-  "fut_metal":     { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
-  // Bois
-  "cajot":         { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
-  "table_nuit_1":  { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
-  "table_nuit_2":  { couleurs: ["Bleu", "Vert", "Rouge"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1 } },
-  "volet_bois":    { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
-  "caisse_bois":   { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose", "Camo"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2, "Camo": 2 } },
-  "tabouret_bois": { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1 } },
-  "table_basse_bois": { couleurs: ["Bleu", "Vert", "Rouge", "Jaune", "Blanc", "Noir", "Rose"], pots: { "Bleu": 1, "Vert": 1, "Rouge": 1, "Jaune": 1, "Blanc": 1, "Noir": 1, "Rose": 2 } },
-};
-
-// Prix de vente d'un circuit imprimé
 const PRIX_CIRCUIT_IMPRIME = 200;
-
 const paniers = new Map();
 const attenteSaisie = new Map();
-const choixEnCours = new Map(); // userId -> { meubleId, qte }
-const messagesParier = new Map(); // userId -> message panier
 
 let messageVenteId = null;
 let messagePDGId = null;
 let channelVenteId = null;
 let channelPDGId = null;
 
-// ─────────────────────────────────────────────
-// BUILDERS CATALOGUE
-// ─────────────────────────────────────────────
 function buildCatalogueEmbed() {
   const parCategorie = {};
   for (const [id, meuble] of Object.entries(catalogue)) {
@@ -130,9 +108,6 @@ function buildCatalogueButtons() {
   );
 }
 
-// ─────────────────────────────────────────────
-// BUILDERS PDG
-// ─────────────────────────────────────────────
 function buildPDGEmbed() {
   return new EmbedBuilder()
     .setTitle('⚙️ Interface PDG — Gestion des prix')
@@ -160,9 +135,6 @@ function buildPDGButtons() {
   return [row1, row2];
 }
 
-// ─────────────────────────────────────────────
-// BUILDERS PANIER
-// ─────────────────────────────────────────────
 function buildPanierEmbed(userId) {
   const panier = paniers.get(userId) || [];
   const total = panier.reduce((acc, item) => acc + item.prix * item.qte, 0);
@@ -205,70 +177,21 @@ function buildPanierButtons(userId) {
   );
 }
 
-async function mettreAJourPanier(interaction, userId) {
-  // Supprimer l'ancien message panier s'il existe
-  const msg = messagesParier.get(userId);
-  if (msg) {
-    try { await msg.delete(); } catch(e) {}
-  }
-  // Créer un nouveau message panier
-  const newMsg = await interaction.reply({
-    embeds: [buildPanierEmbed(userId)],
-    components: getPanierComponents(userId),
-    ephemeral: true,
-    fetchReply: true
-  });
-  messagesParier.set(userId, newMsg);
-}
-
 function getPanierComponents(userId) {
   return [buildMenuMetal(), buildMenuBois(), buildPanierButtons(userId)];
 }
 
-async function ouvrirModal(interaction, meubleId) {
-  const meuble = catalogue[meubleId];
-  const modal = new ModalBuilder()
-    .setCustomId(`modal_qte_${meubleId}`)
-    .setTitle(`${meuble.nom} — Quantité`);
-  const inputQte = new TextInputBuilder()
-    .setCustomId('quantite')
-    .setLabel(`Quantité (prix: ${meuble.prix}€/u)`)
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Ex: 2')
-    .setMinLength(1).setMaxLength(3).setRequired(true);
-  modal.addComponents(new ActionRowBuilder().addComponents(inputQte));
-  await interaction.showModal(modal);
-}
-
-function buildMenuCouleurs(meubleId) {
-  const couleurs = couleursMeubles[meubleId];
-  if (!couleurs) return null;
-  const options = couleurs.couleurs.map(c =>
-    new StringSelectMenuOptionBuilder().setLabel(c).setValue(c)
-  );
-  return new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`choisir_couleur_${meubleId}`)
-      .setPlaceholder('🎨 Choisissez une couleur...')
-      .addOptions(options)
-  );
-}
-
-// ─────────────────────────────────────────────
-// PRODUCTION EMPLOYÉ
-// ─────────────────────────────────────────────
 function buildProductionEmbed() {
   return new EmbedBuilder()
     .setTitle('🏭 Rapport de production — Employé')
     .setColor(0x57F287)
     .setDescription(
       'Entrez les ressources que vous avez achetées.\n\n' +
-      '**Circuits imprimés** (2 par session) :\n' +
-      '• 1 bûche = 1 caoutchouc\n' +
-      '• 1 bûche = 1 plastique\n' +
-      '• 6 pépites de cuivre = 1 lingot = 18 petites plaques\n' +
-      '• 20 pépites d\'or = 1 lingot = 10 petites plaques\n\n' +
-      'Cliquez sur **Soumettre mon rapport** pour calculer !'
+      '**Circuits imprimés :**\n' +
+      '• 2 bûches par circuit\n' +
+      '• 6 pépites de cuivre → 1 lingot → 18 plaques\n' +
+      '• 20 pépites d\'or → 1 lingot → 10 plaques\n\n' +
+      'Cliquez sur **Soumettre mon rapport** !'
     );
 }
 
@@ -278,9 +201,6 @@ function buildProductionButtons() {
   );
 }
 
-// ─────────────────────────────────────────────
-// EVENTS
-// ─────────────────────────────────────────────
 client.once('ready', () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
 });
@@ -288,7 +208,6 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  // Saisie PDG prix ressources
   if (attenteSaisie.has(message.author.id)) {
     const { type } = attenteSaisie.get(message.author.id);
     const valeur = parseFloat(message.content.trim());
@@ -338,80 +257,47 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
 
-  // ── PASSER COMMANDE ──
   if (interaction.isButton() && interaction.customId === 'passer_commande') {
     paniers.set(interaction.user.id, []);
-    const msg = await interaction.reply({
+    await interaction.reply({
       embeds: [buildPanierEmbed(interaction.user.id)],
       components: getPanierComponents(interaction.user.id),
-      ephemeral: true,
-      fetchReply: true
+      ephemeral: true
     });
-    messagesParier.set(interaction.user.id, msg);
   }
 
-  // ── MENUS MEUBLES → ouvre modal directement ──
   if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble_metal' || interaction.customId === 'choisir_meuble_bois')) {
     const meubleId = interaction.values[0];
-    await ouvrirModal(interaction, meubleId);
+    const meuble = catalogue[meubleId];
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_qte_${meubleId}`)
+      .setTitle(`${meuble.nom} — Quantité`);
+    const input = new TextInputBuilder()
+      .setCustomId('quantite')
+      .setLabel(`Prix unitaire: ${meuble.prix}€ — Combien ?`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Ex: 2')
+      .setMinLength(1).setMaxLength(3).setRequired(true);
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    await interaction.showModal(modal);
   }
 
-  // ── MODAL QUANTITÉ ──
   if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_qte_')) {
     const meubleId = interaction.customId.replace('modal_qte_', '');
     const meuble = catalogue[meubleId];
     const qte = parseInt(interaction.fields.getTextInputValue('quantite'));
     if (isNaN(qte) || qte <= 0) { await interaction.reply({ content: '❌ Quantité invalide.', ephemeral: true }); return; }
-
     if (!paniers.has(interaction.user.id)) paniers.set(interaction.user.id, []);
     const panier = paniers.get(interaction.user.id);
-    const existing = panier.find(i => i.id === meubleId && !i.couleur);
+    const existing = panier.find(i => i.id === meubleId);
     if (existing) { existing.qte += qte; }
-    else { panier.push({ id: meubleId, nom: meuble.nom, couleur: null, qte, prix: meuble.prix }); }
-    const couleursDispo = couleursMeubles[meubleId];
-    if (couleursDispo) {
-      // Stocker le choix et afficher menu couleur
-      choixEnCours.set(interaction.user.id, { meubleId, qte, nomMeuble: meuble.nom, prixMeuble: meuble.prix });
-      const menuCouleur = buildMenuCouleurs(meubleId);
-      await interaction.reply({
-        content: `**${meuble.nom} × ${qte}** — Choisissez maintenant la couleur :`,
-        components: [menuCouleur],
-        ephemeral: true
-      });
-    } else {
-      // Pas de couleur, ajouter directement au panier
-      await interaction.reply({
-        embeds: [buildPanierEmbed(interaction.user.id)],
-        components: getPanierComponents(interaction.user.id),
-        ephemeral: true
-      });
-    }
+    else { panier.push({ id: meubleId, nom: meuble.nom, qte, prix: meuble.prix }); }
+    await interaction.update({
+      embeds: [buildPanierEmbed(interaction.user.id)],
+      components: getPanierComponents(interaction.user.id),
+    });
   }
 
-  // ── MENU COULEUR ──
-  if (interaction.isStringSelectMenu() && interaction.customId.startsWith('choisir_couleur_')) {
-    const meubleId = interaction.customId.replace('choisir_couleur_', '');
-    const couleurChoisie = interaction.values[0];
-    const choix = choixEnCours.get(interaction.user.id);
-    if (!choix) return interaction.reply({ content: '❌ Session expirée, recommence.', ephemeral: true });
-
-    const couleursDispo = couleursMeubles[meubleId];
-    const nbPots = couleursDispo.pots[couleurChoisie] || 1;
-    const prixPeinture = nbPots * PRIX_PEINTURE;
-    const prixFinal = choix.prixMeuble + prixPeinture;
-    const nomFinal = `${choix.nomMeuble} (${couleurChoisie})`;
-
-    if (!paniers.has(interaction.user.id)) paniers.set(interaction.user.id, []);
-    const panier = paniers.get(interaction.user.id);
-    const existing = panier.find(i => i.id === meubleId && i.couleur === couleurChoisie);
-    if (existing) { existing.qte += choix.qte; }
-    else { panier.push({ id: meubleId, nom: nomFinal, couleur: couleurChoisie, qte: choix.qte, prix: prixFinal }); }
-
-    choixEnCours.delete(interaction.user.id);
-    await mettreAJourPanier(interaction, interaction.user.id);
-  }
-
-  // ── VALIDER COMMANDE ──
   if (interaction.isButton() && interaction.customId === 'valider_commande') {
     const panier = paniers.get(interaction.user.id) || [];
     if (panier.length === 0) return interaction.reply({ content: '❌ Panier vide.', ephemeral: true });
@@ -450,13 +336,11 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.update({ content: `✅ Commande validée ! Rendez-vous dans <#${salon.id}>`, embeds: [], components: [] });
   }
 
-  // ── ANNULER ──
   if (interaction.isButton() && interaction.customId === 'annuler_commande') {
     paniers.delete(interaction.user.id);
     await interaction.update({ content: '❌ Commande annulée.', embeds: [], components: [] });
   }
 
-  // ── CLÔTURER ──
   if (interaction.isButton() && interaction.customId.startsWith('cloturer_')) {
     if (!isPDGouCoPDG(interaction.member)) {
       return interaction.reply({ content: '❌ Réservé au PDG et Co-PDG.', ephemeral: true });
@@ -469,122 +353,67 @@ client.on('interactionCreate', async (interaction) => {
     }, 5000);
   }
 
-  // ── SOUMETTRE PRODUCTION ──
   if (interaction.isButton() && interaction.customId === 'soumettre_production') {
     if (!isRestoker(interaction.member)) {
       return interaction.reply({ content: '❌ Réservé aux Restokers.', ephemeral: true });
     }
-    const modal = new ModalBuilder()
-      .setCustomId('modal_production')
-      .setTitle('📋 Rapport de production');
-
-    const inputBuches = new TextInputBuilder()
-      .setCustomId('buches')
-      .setLabel(`Nombre de bûches achetées (${prixRessources.buche}€/u)`)
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 200')
-      .setRequired(true);
-
-    const inputCuivre = new TextInputBuilder()
-      .setCustomId('cuivre')
-      .setLabel(`Pépites de cuivre achetées (${prixRessources.pepiteCuivre}€/u)`)
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 36')
-      .setRequired(true);
-
-    const inputOr = new TextInputBuilder()
-      .setCustomId('or')
-      .setLabel(`Pépites d'or achetées (${prixRessources.pepiteOr}€/u)`)
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 200')
-      .setRequired(true);
-
-    const inputMagnetite = new TextInputBuilder()
-      .setCustomId('magnetite')
-      .setLabel(`Pépites de magnétite achetées (${prixRessources.pepiteMagnetite}€/u)`)
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Ex: 0 (mettre 0 si aucune)')
-      .setRequired(true);
-
+    const modal = new ModalBuilder().setCustomId('modal_production').setTitle('📋 Rapport de production');
     modal.addComponents(
-      new ActionRowBuilder().addComponents(inputBuches),
-      new ActionRowBuilder().addComponents(inputCuivre),
-      new ActionRowBuilder().addComponents(inputOr),
-      new ActionRowBuilder().addComponents(inputMagnetite),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('buches').setLabel(`Bûches achetées (${prixRessources.buche}€/u)`).setStyle(TextInputStyle.Short).setPlaceholder('Ex: 2000').setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('cuivre').setLabel(`Pépites de cuivre (${prixRessources.pepiteCuivre}€/u)`).setStyle(TextInputStyle.Short).setPlaceholder('Ex: 336').setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('or').setLabel(`Pépites d'or (${prixRessources.pepiteOr}€/u)`).setStyle(TextInputStyle.Short).setPlaceholder('Ex: 2000').setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('magnetite').setLabel(`Pépites de magnétite (${prixRessources.pepiteMagnetite}€/u)`).setStyle(TextInputStyle.Short).setPlaceholder('Ex: 0').setRequired(true)),
     );
-
     await interaction.showModal(modal);
   }
 
-  // ── MODAL PRODUCTION ──
   if (interaction.isModalSubmit() && interaction.customId === 'modal_production') {
     const buches = parseInt(interaction.fields.getTextInputValue('buches')) || 0;
     const cuivre = parseInt(interaction.fields.getTextInputValue('cuivre')) || 0;
     const or = parseInt(interaction.fields.getTextInputValue('or')) || 0;
     const magnetite = parseInt(interaction.fields.getTextInputValue('magnetite')) || 0;
-
-    // Calcul circuits imprimés (le jeu produit 2x le résultat Excel)
-    // Bûches : floor(bûches / 2) * 2
-    // Or : floor(or / 20) * 10 * 2
-    // Cuivre : floor(cuivre / 6) * 18 * 2
     const circuitsViaBuches = Math.floor(buches / 2) * 2;
     const circuitsViaCuivre = Math.floor(cuivre / 6) * 18 * 2;
     const circuitsViaOr = Math.floor(or / 20) * 10 * 2;
     const nbCircuits = Math.min(circuitsViaBuches, circuitsViaCuivre, circuitsViaOr);
-
-    // Coût total employé
     const coutBuches = buches * prixRessources.buche;
     const coutCuivre = cuivre * prixRessources.pepiteCuivre;
     const coutOr = or * prixRessources.pepiteOr;
     const coutMagnetite = magnetite * prixRessources.pepiteMagnetite;
     const coutTotal = coutBuches + coutCuivre + coutOr + coutMagnetite;
-
-    // Chiffre d'affaires
     const ca = nbCircuits * PRIX_CIRCUIT_IMPRIME;
-
-    // Embed résultat pour l'employé
     const embedResultat = new EmbedBuilder()
       .setTitle('✅ Rapport de production calculé')
       .setColor(0x57F287)
       .addFields(
         { name: '📦 Ressources achetées', value:
           `• Bûches : ${buches} × ${prixRessources.buche}€ = **${coutBuches}€**\n` +
-          `• Pépites de cuivre : ${cuivre} × ${prixRessources.pepiteCuivre}€ = **${coutCuivre}€**\n` +
-          `• Pépites d'or : ${or} × ${prixRessources.pepiteOr}€ = **${coutOr}€**\n` +
-          `• Pépites de magnétite : ${magnetite} × ${prixRessources.pepiteMagnetite}€ = **${coutMagnetite}€**`
+          `• Cuivre : ${cuivre} × ${prixRessources.pepiteCuivre}€ = **${coutCuivre}€**\n` +
+          `• Or : ${or} × ${prixRessources.pepiteOr}€ = **${coutOr}€**\n` +
+          `• Magnétite : ${magnetite} × ${prixRessources.pepiteMagnetite}€ = **${coutMagnetite}€**`
         },
-        { name: '💸 Total dépensé (à rembourser)', value: `**${coutTotal}€**`, inline: true },
-        { name: '🔌 Circuits imprimés fabriqués', value: `**${nbCircuits}**`, inline: true },
-        { name: '💰 CA généré pour l\'entreprise', value: `**${ca}€**`, inline: true },
+        { name: '💸 Total à rembourser', value: `**${coutTotal}€**`, inline: true },
+        { name: '🔌 Circuits fabriqués', value: `**${nbCircuits}**`, inline: true },
+        { name: '💰 CA généré', value: `**${ca}€**`, inline: true },
       )
-      .setTimestamp()
-      .setFooter({ text: `Rapport de ${interaction.user.username}` });
-
+      .setTimestamp().setFooter({ text: `Rapport de ${interaction.user.username}` });
     await interaction.reply({ embeds: [embedResultat], ephemeral: true });
-
-    // Log dans le salon production
     try {
-      const logChannel = await interaction.client.channels.fetch(SALON_LOGS_PRODUCTION);
+      const logChannel = await client.channels.fetch(SALON_LOGS_PRODUCTION);
       const embedLog = new EmbedBuilder()
         .setTitle('🏭 Nouveau rapport de production')
         .setColor(0x5865F2)
         .addFields(
           { name: 'Employé', value: `<@${interaction.user.id}>`, inline: true },
-          { name: '🔌 Circuits fabriqués', value: `**${nbCircuits}**`, inline: true },
-          { name: '💰 CA généré', value: `**${ca}€**`, inline: true },
+          { name: '🔌 Circuits', value: `**${nbCircuits}**`, inline: true },
+          { name: '💰 CA', value: `**${ca}€**`, inline: true },
           { name: '💸 À rembourser', value: `**${coutTotal}€**`, inline: true },
-          { name: '📦 Détail ressources', value:
-            `Bûches: ${buches} | Cuivre: ${cuivre} | Or: ${or} | Magnétite: ${magnetite}`
-          },
-        )
-        .setTimestamp();
+          { name: '📦 Ressources', value: `Bûches: ${buches} | Cuivre: ${cuivre} | Or: ${or} | Magnétite: ${magnetite}` },
+        ).setTimestamp();
       await logChannel.send({ embeds: [embedLog] });
-    } catch (e) {
-      console.error('Erreur envoi log production:', e);
-    }
+    } catch (e) {}
   }
 
-  // ── BOUTONS PDG ──
   if (interaction.isButton() && ['set_buche', 'set_magnetite', 'set_cuivre', 'set_or'].includes(interaction.customId)) {
     if (!interaction.member.roles.cache.has(ROLE_PDG)) {
       return interaction.reply({ content: '❌ Réservé au PDG.', ephemeral: true });
@@ -595,7 +424,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({ content: `💬 Entrez le nouveau prix pour **${noms[type]}** :`, ephemeral: true });
   }
 
-  // ── ACTUALISER CATALOGUE ──
   if (interaction.isButton() && interaction.customId === 'actualiser_catalogue') {
     if (!interaction.member.roles.cache.has(ROLE_PDG)) {
       return interaction.reply({ content: '❌ Réservé au PDG.', ephemeral: true });
@@ -621,3 +449,4 @@ client.on('interactionCreate', async (interaction) => {
 const token = process.env.TOKEN;
 console.log("Token trouvé:", token ? "OUI" : "NON");
 client.login(token);
+EOF
