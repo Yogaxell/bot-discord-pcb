@@ -73,6 +73,17 @@ const catalogue = {
   "etagere_murale":    { nom: "Étagère murale",       categorie: "Mixte",  prix: 35  },
   "etagere_murale_18": { nom: "Étagère murale 1.8m",  categorie: "Mixte",  prix: 45  },
   "cagette_fruits":    { nom: "Cagette de fruits",    categorie: "Bois",   prix: 30  },
+
+  // ── MEUBLES AVEC COULEUR (prix de base + 30€ peinture) ──
+  "chaise_metal_couleur":     { nom: "Chaise en métal (avec couleur)",     categorie: "Couleur", prix: 105 },
+  "fut_metal_couleur":        { nom: "Fût en métal (avec couleur)",         categorie: "Couleur", prix: 115 },
+  "table_basse_couleur":      { nom: "Table basse bois (avec couleur)",     categorie: "Couleur", prix: 62  },
+  "caillebotis_couleur":      { nom: "Caillebotis (avec couleur)",          categorie: "Couleur", prix: 50  },
+  "cajot_couleur":            { nom: "Cajot (avec couleur)",                categorie: "Couleur", prix: 75  },
+  "table_nuit_1_couleur":     { nom: "Table de nuit 1 (avec couleur)",      categorie: "Couleur", prix: 72  },
+  "table_nuit_3_couleur":     { nom: "Table de nuit 3 (avec couleur)",      categorie: "Couleur", prix: 80  },
+  "tabouret_bois_couleur":    { nom: "Tabouret bois (avec couleur)",        categorie: "Couleur", prix: 135 },
+  "caisse_bois_couleur":      { nom: "Caisse bois (avec couleur)",          categorie: "Couleur", prix: 145 },
 };
 
 const PRIX_CIRCUIT_IMPRIME = 200;
@@ -95,8 +106,9 @@ function buildCatalogueEmbed() {
     .setColor(0x2b2d31)
     .setDescription('Cliquez sur **Passer commande** pour commander !');
   for (const [cat, lignes] of Object.entries(parCategorie)) {
-    const emoji = cat === 'Bois' ? '🪵' : cat === 'Métal' ? '🔩' : '🔧';
-    embed.addFields({ name: `${emoji} ${cat}`, value: lignes.join('\n') });
+    const emoji = cat === 'Bois' ? '🪵' : cat === 'Métal' ? '🔩' : cat === 'Couleur' ? '🎨' : '🔧';
+    const nomCat = cat === 'Couleur' ? 'Avec couleur (+30€ peinture)' : cat;
+    embed.addFields({ name: `${emoji} ${nomCat}`, value: lignes.join('\n') });
   }
   return embed;
 }
@@ -168,6 +180,16 @@ function buildMenuBois() {
   );
 }
 
+function buildMenuCouleur() {
+  const entries = Object.entries(catalogue).filter(([id, m]) => m.categorie === 'Couleur');
+  const options = entries.map(([id, m]) =>
+    new StringSelectMenuOptionBuilder().setLabel(m.nom).setValue(id).setDescription(`${m.prix}€`)
+  );
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder().setCustomId('choisir_meuble_couleur').setPlaceholder('🎨 Meubles avec couleur...').addOptions(options)
+  );
+}
+
 function buildPanierButtons(userId) {
   const panier = paniers.get(userId) || [];
   return new ActionRowBuilder().addComponents(
@@ -177,7 +199,7 @@ function buildPanierButtons(userId) {
 }
 
 function getPanierComponents(userId) {
-  return [buildMenuMetal(), buildMenuBois(), buildPanierButtons(userId)];
+  return [buildMenuMetal(), buildMenuBois(), buildMenuCouleur(), buildPanierButtons(userId)];
 }
 
 function buildProductionEmbed() {
@@ -265,7 +287,7 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
-  if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble_metal' || interaction.customId === 'choisir_meuble_bois')) {
+  if (interaction.isStringSelectMenu() && (interaction.customId === 'choisir_meuble_metal' || interaction.customId === 'choisir_meuble_bois' || interaction.customId === 'choisir_meuble_couleur')) {
     const meubleId = interaction.values[0];
     const meuble = catalogue[meubleId];
     const modal = new ModalBuilder()
