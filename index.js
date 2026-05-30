@@ -89,6 +89,7 @@ const catalogue = {
 const PRIX_CIRCUIT_IMPRIME = 200;
 const paniers = new Map();
 const attenteSaisie = new Map();
+const lieuxLivraison = new Map(); // userId -> lieu de livraison
 
 let messageVenteId = null;
 let messagePDGId = null;
@@ -192,8 +193,11 @@ function buildMenuCouleur() {
 
 function buildPanierButtons(userId) {
   const panier = paniers.get(userId) || [];
+  const lieu = lieuxLivraison.get(userId);
+  const lieuLabel = lieu ? `📍 ${lieu}` : '📍 Indiquer le lieu de livraison';
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('valider_commande').setLabel('✅ Valider la commande').setStyle(ButtonStyle.Success).setDisabled(panier.length === 0),
+    new ButtonBuilder().setCustomId('saisir_lieu').setLabel(lieuLabel).setStyle(lieu ? ButtonStyle.Secondary : ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('valider_commande').setLabel('✅ Valider la commande').setStyle(ButtonStyle.Success).setDisabled(panier.length === 0 || !lieu),
     new ButtonBuilder().setCustomId('annuler_commande').setLabel('❌ Annuler').setStyle(ButtonStyle.Danger),
   );
 }
@@ -344,6 +348,7 @@ client.on('interactionCreate', async (interaction) => {
       .setColor(0xFEE75C)
       .addFields(
         { name: 'Client', value: `<@${member.id}>` },
+        { name: '📍 Lieu de livraison', value: lieuxLivraison.get(member.id) || 'Non renseigné' },
         { name: 'Meubles commandés', value: lignes },
         { name: '💰 Total', value: `**${total}€**` },
       )
@@ -354,12 +359,40 @@ client.on('interactionCreate', async (interaction) => {
     await salon.send({ embeds: [embed], components: [rowSalon] });
     await salon.send(`Bonjour <@${member.id}> ! Votre commande a été enregistrée. Total : **${total}€**. Un membre de l'équipe vous contactera bientôt.`);
     paniers.delete(interaction.user.id);
+    lieuxLivraison.delete(interaction.user.id);
     await interaction.update({ content: `✅ Commande validée ! Rendez-vous dans <#${salon.id}>`, embeds: [], components: [] });
   }
 
   if (interaction.isButton() && interaction.customId === 'annuler_commande') {
     paniers.delete(interaction.user.id);
+    lieuxLivraison.delete(interaction.user.id);
     await interaction.update({ content: '❌ Commande annulée.', embeds: [], components: [] });
+  }
+
+  // ── SAISIR LIEU DE LIVRAISON ──
+  if (interaction.isButton() && interaction.customId === 'saisir_lieu') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_lieu')
+      .setTitle('📍 Lieu de livraison');
+    const input = new TextInputBuilder()
+      .setCustomId('lieu')
+      .setLabel('Où souhaitez-vous être livré ?')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Entreprise / Maison ou numéro de terrain')
+      .setMaxLength(100)
+      .setRequired(true);
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    await interaction.showModal(modal);
+  }
+
+  // ── MODAL LIEU ──
+  if (interaction.isModalSubmit() && interaction.customId === 'modal_lieu') {
+    const lieu = interaction.fields.getTextInputValue('lieu').trim();
+    lieuxLivraison.set(interaction.user.id, lieu);
+    await interaction.update({
+      embeds: [buildPanierEmbed(interaction.user.id)],
+      components: getPanierComponents(interaction.user.id),
+    });
   }
 
   if (interaction.isButton() && interaction.customId.startsWith('cloturer_')) {
