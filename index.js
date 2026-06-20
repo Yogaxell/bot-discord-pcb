@@ -86,7 +86,7 @@ const catalogue = {
   "caisse_bois_couleur":      { nom: "Caisse bois (avec couleur)",          categorie: "Couleur", prix: 145 },
 };
 
-const PRIX_CIRCUIT_IMPRIME = 200;
+let PRIX_CIRCUIT_IMPRIME = 200;
 const paniers = new Map();
 const attenteSaisie = new Map();
 const lieuxLivraison = new Map(); // userId -> lieu de livraison
@@ -129,6 +129,7 @@ function buildPDGEmbed() {
       { name: '🔩 Magnétite', value: `${prixRessources.pepiteMagnetite}€`, inline: true },
       { name: '🟠 Cuivre', value: `${prixRessources.pepiteCuivre}€`, inline: true },
       { name: '✨ Or', value: `${prixRessources.pepiteOr}€`, inline: true },
+      { name: '🔌 Circuit imprimé (prix vente)', value: `${PRIX_CIRCUIT_IMPRIME}€`, inline: true },
     )
     .setDescription('Modifiez les prix des ressources puis cliquez sur **Actualiser le catalogue**.')
     .setTimestamp();
@@ -140,6 +141,7 @@ function buildPDGButtons() {
     new ButtonBuilder().setCustomId('set_magnetite').setLabel('Magnétite').setStyle(ButtonStyle.Secondary).setEmoji('🔩'),
     new ButtonBuilder().setCustomId('set_cuivre').setLabel('Cuivre').setStyle(ButtonStyle.Secondary).setEmoji('🟠'),
     new ButtonBuilder().setCustomId('set_or').setLabel('Or').setStyle(ButtonStyle.Secondary).setEmoji('✨'),
+    new ButtonBuilder().setCustomId('set_circuit').setLabel('Circuit imprimé').setStyle(ButtonStyle.Secondary).setEmoji('🔌'),
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('actualiser_catalogue').setLabel('🔄 Actualiser le catalogue').setStyle(ButtonStyle.Success),
@@ -241,6 +243,7 @@ client.on('messageCreate', async (message) => {
     else if (type === 'magnetite') prixRessources.pepiteMagnetite = valeur;
     else if (type === 'cuivre') prixRessources.pepiteCuivre = valeur;
     else if (type === 'or') prixRessources.pepiteOr = valeur;
+    else if (type === 'circuit') PRIX_CIRCUIT_IMPRIME = valeur;
     attenteSaisie.delete(message.author.id);
     await message.reply('✅ Prix mis à jour !');
     if (channelPDGId && messagePDGId) {
@@ -468,12 +471,12 @@ client.on('interactionCreate', async (interaction) => {
     } catch (e) {}
   }
 
-  if (interaction.isButton() && ['set_buche', 'set_magnetite', 'set_cuivre', 'set_or'].includes(interaction.customId)) {
+  if (interaction.isButton() && ['set_buche', 'set_magnetite', 'set_cuivre', 'set_or', 'set_circuit'].includes(interaction.customId)) {
     if (!interaction.member.roles.cache.has(ROLE_PDG)) {
       return interaction.reply({ content: '❌ Réservé au PDG.', ephemeral: true });
     }
     const type = interaction.customId.replace('set_', '');
-    const noms = { buche: 'Bûche', magnetite: 'Magnétite', cuivre: 'Cuivre', or: 'Or' };
+    const noms = { buche: 'Bûche', magnetite: 'Magnétite', cuivre: 'Cuivre', or: 'Or', circuit: 'Circuit imprimé' };
     attenteSaisie.set(interaction.user.id, { type });
     await interaction.reply({ content: `💬 Entrez le nouveau prix pour **${noms[type]}** :`, ephemeral: true });
   }
